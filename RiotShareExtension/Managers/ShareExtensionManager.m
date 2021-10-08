@@ -188,7 +188,7 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
         dispatch_group_leave(requestsGroup);
     };
     
-    __weak typeof(self) weakSelf = self;
+    MXWeakify(self);
     
     for (NSExtensionItem *item in self.shareExtensionContext.inputItems)
     {
@@ -203,15 +203,12 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
                     // Switch back on the main thread to handle correctly the UI change
                     dispatch_async(dispatch_get_main_queue(), ^{
                         
-                        if (weakSelf)
-                        {
-                            typeof(self) self = weakSelf;
-                            [self sendFileWithUrl:fileUrl
-                                           toRoom:room
-                                     successBlock:^{
-                                         requestSuccess(item);
-                                     } failureBlock:requestFailure];
-                        }
+                        MXStrongifyAndReturnIfNil(self);
+                        
+                        [self sendFileWithUrl:fileUrl
+                                       toRoom:room
+                                 successBlock:^{ requestSuccess(item); }
+                                 failureBlock:requestFailure];
                         
                     });
                     
@@ -226,15 +223,12 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
                     // Switch back on the main thread to handle correctly the UI change
                     dispatch_async(dispatch_get_main_queue(), ^{
                         
-                        if (weakSelf)
-                        {
-                            typeof(self) self = weakSelf;
-                            [self sendText:text
-                                    toRoom:room
-                              successBlock:^{
-                                  requestSuccess(item);
-                              } failureBlock:requestFailure];
-                        }
+                        MXStrongifyAndReturnIfNil(self);
+
+                        [self sendText:text
+                                toRoom:room
+                          successBlock:^{ requestSuccess(item); }
+                          failureBlock:requestFailure];
                         
                     });
                     
@@ -249,15 +243,12 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
                     // Switch back on the main thread to handle correctly the UI change
                     dispatch_async(dispatch_get_main_queue(), ^{
                         
-                        if (weakSelf)
-                        {
-                            typeof(self) self = weakSelf;
-                            [self sendText:url.absoluteString
-                                    toRoom:room
-                              successBlock:^{
-                                        requestSuccess(item);
-                            } failureBlock:requestFailure];
-                        }
+                        MXStrongifyAndReturnIfNil(self);
+                        
+                        [self sendText:url.absoluteString
+                                toRoom:room
+                          successBlock:^{ requestSuccess(item); }
+                          failureBlock:requestFailure];
                         
                     });
                     
@@ -271,85 +262,73 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
                 
                 [itemProvider loadItemForTypeIdentifier:UTTypeImage options:nil completionHandler:^(id<NSSecureCoding> _Nullable itemProviderItem, NSError * _Null_unspecified error)
                  {
-                     if (weakSelf)
-                     {
-                         typeof(self) self = weakSelf;
-                         itemProvider.isLoaded = YES;
-                         
-                         NSData *imageData;
-                         
-                         if ([(NSObject *)itemProviderItem isKindOfClass:[NSData class]])
-                         {
-                             imageData = (NSData*)itemProviderItem;
-                         }
-                         else if ([(NSObject *)itemProviderItem isKindOfClass:[NSURL class]])
-                         {
-                             NSURL *imageURL = (NSURL*)itemProviderItem;
-                             imageData = [NSData dataWithContentsOfURL:imageURL];
-                         }
-                         else if ([(NSObject *)itemProviderItem isKindOfClass:[UIImage class]])
-                         {
-                             // An application can share directly an UIImage.
-                             // The most common case is screenshot sharing without saving to file.
-                             // As screenshot using PNG format when they are saved to file we also use PNG format when saving UIImage to NSData.
-                             UIImage *image = (UIImage*)itemProviderItem;
-                             imageData = UIImagePNGRepresentation(image);
-                         }
-                         
-                         if (imageData)
-                         {
-                             if (areAllAttachmentsImages)
-                             {
-                                 [self.pendingImages addObject:imageData];
-                                 [pendingImagesItemProviders addObject:itemProvider];
-                             }
-                             else
-                             {
-                                 CGSize imageSize = [self imageSizeFromImageData:imageData];
-                                 self.imageCompressionMode = ImageCompressionModeNone;
-                                 self.actualLargeSize = MAX(imageSize.width, imageSize.height);
-                                 
-                                 [self sendImageData:imageData
-                                        withProvider:itemProvider
-                                              toRoom:room
-                                        successBlock:^{
-                                            requestSuccess(item);
-                                        } failureBlock:requestFailure];
-                             }
-                         }
-                         else
-                         {
-                             MXLogDebug(@"[ShareExtensionManager] sendContentToRoom: failed to loadItemForTypeIdentifier. Error: %@", error);
-                             dispatch_group_leave(requestsGroup);
-                         }
-                         
-                         // Only prompt for image resize if all items are images
-                         // Ignore showMediaCompressionPrompt setting due to memory constraints with full size images.
-                         if (areAllAttachmentsImages)
-                         {
-                             if ([self areAttachmentsFullyLoaded])
-                             {
-                                 UIAlertController *compressionPrompt = [self compressionPromptForPendingImagesWithShareBlock:^{
-                                     [self sendImageDatas:self.pendingImages
-                                            withProviders:pendingImagesItemProviders
-                                                   toRoom:room
-                                             successBlock:^{
-                                                 requestSuccess(item);
-                                             } failureBlock:requestFailure];
-                                 }];
-                                 
-                                 if (compressionPrompt)
-                                 {
-                                     [self.delegate shareExtensionManager:self showImageCompressionPrompt:compressionPrompt];
-                                 }
-                             }
-                             else
-                             {
-                                 dispatch_group_leave(requestsGroup);
-                             }
-                         }
-                     }
-                 }];
+                    MXStrongifyAndReturnIfNil(self);
+                    
+                    itemProvider.isLoaded = YES;
+                    
+                    NSData *imageData = [self imageDataFromItemProviderItem:itemProviderItem];
+                    
+                    if (imageData)
+                    {
+                        if (areAllAttachmentsImages)
+                        {
+                            // When all items are images, they're processed together from the
+                            // pending list, immediately after the final image has been loaded.
+                            [self.pendingImages addObject:imageData];
+                            [pendingImagesItemProviders addObject:itemProvider];
+                        }
+                        else
+                        {
+                            // Otherwise, the image is sent as is, without prompting for a resize
+                            // as that wouldn't make much sense with multiple content types.
+                            self.imageCompressionMode = ImageCompressionModeNone;
+                            
+                            [self sendImageData:imageData
+                                   withProvider:itemProvider
+                                         toRoom:room
+                                   successBlock:^{ requestSuccess(item); }
+                                   failureBlock:requestFailure];
+                        }
+                    }
+                    else
+                    {
+                        MXLogDebug(@"[ShareExtensionManager] sendContentToRoom: failed to loadItemForTypeIdentifier. Error: %@", error);
+                        dispatch_group_leave(requestsGroup);
+                    }
+                    
+                    // When there a multiple content types the image will have been sent above.
+                    if (areAllAttachmentsImages)
+                    {
+                        // If we have loaded the last image, send all images taking into account the showMediaCompressionPrompt setting.
+                        if ([self areAttachmentsFullyLoaded])
+                        {
+                            void (^sendPendingImages)(void) = ^void() { [self sendImageDatas:self.pendingImages
+                                                                               withProviders:pendingImagesItemProviders
+                                                                                      toRoom:room
+                                                                                successBlock:^{ requestSuccess(item); }
+                                                                                failureBlock:requestFailure]; };
+                            
+                            if (RiotSettings.shared.showMediaCompressionPrompt)
+                            {
+                                // Create a compression prompt which will be nil when there are no pending images.
+                                UIAlertController *compressionPrompt = [self compressionPromptForPendingImagesWithShareBlock:sendPendingImages];
+                                if (compressionPrompt)
+                                {
+                                    [self.delegate shareExtensionManager:self showImageCompressionPrompt:compressionPrompt];
+                                }
+                            }
+                            else
+                            {
+                                self.imageCompressionMode = ImageCompressionModeNone;
+                                sendPendingImages();
+                            }
+                        }
+                        else
+                        {
+                            dispatch_group_leave(requestsGroup);
+                        }
+                    }
+                }];
             }
             else if ([itemProvider hasItemConformingToTypeIdentifier:UTTypeVideo])
             {
@@ -360,15 +339,12 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
                      // Switch back on the main thread to handle correctly the UI change
                      dispatch_async(dispatch_get_main_queue(), ^{
                          
-                         if (weakSelf)
-                         {
-                             typeof(self) self = weakSelf;
-                             [self sendVideo:videoLocalUrl
-                                      toRoom:room
-                                successBlock:^{
-                                 requestSuccess(item);
-                             } failureBlock:requestFailure];
-                         }
+                         MXStrongifyAndReturnIfNil(self);
+                         
+                         [self sendVideo:videoLocalUrl
+                                  toRoom:room
+                            successBlock:^{ requestSuccess(item); }
+                            failureBlock:requestFailure];
                          
                      });
                     
@@ -383,15 +359,12 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
                      // Switch back on the main thread to handle correctly the UI change
                      dispatch_async(dispatch_get_main_queue(), ^{
                          
-                         if (weakSelf)
-                         {
-                             typeof(self) self = weakSelf;
-                             [self sendVideo:videoLocalUrl
-                                      toRoom:room
-                                successBlock:^{
-                                    requestSuccess(item);
-                                } failureBlock:requestFailure];
-                         }
+                         MXStrongifyAndReturnIfNil(self);
+                         
+                         [self sendVideo:videoLocalUrl
+                                  toRoom:room
+                            successBlock:^{ requestSuccess(item); }
+                            failureBlock:requestFailure];
                          
                      });
                      
@@ -471,20 +444,20 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
     [NSException raise:@"Kill the app extension" format:@"Free memory used by share extension"];
 }
 
-- (BOOL)isAPendingImageNotOrientedUp
+- (BOOL)pendingImagesNeedRotation
 {
-    BOOL isAPendingImageNotOrientedUp = NO;
+    BOOL pendingImageNeedsRotation = NO;
     
     for (NSData *imageData in self.pendingImages)
     {
-        if ([self isImageOrientationNotUpOrUndeterminedForImageData:imageData])
+        if ([self shouldRotateImageData:imageData])
         {
-            isAPendingImageNotOrientedUp = YES;
+            pendingImageNeedsRotation = YES;
             break;
         }
     }
     
-    return isAPendingImageNotOrientedUp;
+    return pendingImageNeedsRotation;
 }
 
 // TODO: When select multiple images:
@@ -498,7 +471,7 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
     }
     
     UIAlertController *compressionPrompt;
-    BOOL isAPendingImageNotOrientedUp = [self isAPendingImageNotOrientedUp];
+    BOOL pendingImagesNeedRotation = [self pendingImagesNeedRotation];
     
     NSData *firstImageData = self.pendingImages.firstObject;
     UIImage *firstImage = [UIImage imageWithData:firstImageData];
@@ -603,7 +576,7 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
         }
         
         // To limit memory consumption, we suggest the original resolution only if the image orientation is up, or if the image size is moderate
-        if (!isAPendingImageNotOrientedUp || !compressionSizes.large.fileSize)
+        if (!pendingImagesNeedRotation || !compressionSizes.large.fileSize)
         {
             NSString *fileSizeString = [MXTools fileSizeToString:compressionSizes.original.fileSize];
             
@@ -637,7 +610,7 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
     }
     else
     {
-        if (isAPendingImageNotOrientedUp && self.pendingImages.count > 1)
+        if (pendingImagesNeedRotation && self.pendingImages.count > 1)
         {
             self.imageCompressionMode = ImageCompressionModeSmall;
         }
@@ -718,6 +691,31 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
     return uti;
 }
 
+- (NSData *)imageDataFromItemProviderItem:(id<NSSecureCoding>)item
+{
+    if ([(NSObject *)item isKindOfClass:[NSData class]])
+    {
+        return (NSData*)item;
+    }
+    
+    if ([(NSObject *)item isKindOfClass:[NSURL class]])
+    {
+        NSURL *imageURL = (NSURL*)item;
+        return [NSData dataWithContentsOfURL:imageURL];
+    }
+    
+    if ([(NSObject *)item isKindOfClass:[UIImage class]])
+    {
+        // An application can share directly an UIImage.
+        // The most common case is screenshot sharing without saving to file.
+        // As screenshot using PNG format when they are saved to file we also use PNG format when saving UIImage to NSData.
+        UIImage *image = (UIImage*)item;
+        return UIImagePNGRepresentation(image);
+    }
+    
+    return nil;
+}
+
 - (NSString*)utiFromImageData:(NSData*)imageData
 {
     CGImageSourceRef imageSource = CGImageSourceCreateWithData((CFDataRef)imageData, NULL);
@@ -794,7 +792,7 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
     return CGSizeMake(width, height);
 }
 
-- (NSNumber*)cgImageimageOrientationNumberFromImageData:(NSData*)imageData
+- (NSNumber*)cgImageOrientationNumberFromImageData:(NSData*)imageData
 {
     NSNumber *orientationNumber;
     
@@ -820,18 +818,19 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
     return orientationNumber;
 }
 
-- (BOOL)isImageOrientationNotUpOrUndeterminedForImageData:(NSData*)imageData
+- (BOOL)shouldRotateImageData:(NSData*)imageData
 {
-    BOOL isImageNotOrientedUp = YES;
+    BOOL isImageOrientedUp = NO;
     
-    NSNumber *cgImageOrientationNumber = [self cgImageimageOrientationNumberFromImageData:imageData];
+    NSNumber *cgImageOrientationNumber = [self cgImageOrientationNumberFromImageData:imageData];
     
     if (cgImageOrientationNumber && cgImageOrientationNumber.unsignedIntegerValue == (NSUInteger)kCGImagePropertyOrientationUp)
     {
-        isImageNotOrientedUp = NO;
+        isImageOrientedUp = YES;
     }
     
-    return isImageNotOrientedUp;
+    // Image needs rotation is its orientation isn't up.
+    return !isImageOrientedUp;
 }
 
 - (void)logCompressionSizeChoice:(MXKImageCompressionSize)compressionSize
@@ -1027,17 +1026,7 @@ typedef NS_ENUM(NSInteger, ImageCompressionMode)
                 break;
         }
         
-        if (CGSizeEqualToSize(newImageSize, CGSizeZero))
-        {
-            // No resize to make
-            // Make sure the uploaded image orientation is up
-            if ([self isImageOrientationNotUpOrUndeterminedForImageData:imageData])
-            {
-                UIImage *image = [UIImage imageWithData:imageData];
-                convertedImage = [MXKTools forceImageOrientationUp:image];
-            }
-        }
-        else
+        if (!CGSizeEqualToSize(newImageSize, CGSizeZero))
         {
             // Resize the image and set image in right orientation too
             convertedImage = [MXKTools resizeImageWithData:imageData toFitInSize:newImageSize];

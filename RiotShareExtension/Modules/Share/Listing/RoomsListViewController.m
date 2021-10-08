@@ -189,6 +189,7 @@
     }];
     
     [alertController addAction:sendAction];
+    alertController.preferredAction = sendAction;
     
     [self presentViewController:alertController animated:YES completion:nil];
 }
