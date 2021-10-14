@@ -3170,8 +3170,7 @@ const NSTimeInterval kResizeComposerAnimationDuration = .05;
             NSExtensionItem *item = [[NSExtensionItem alloc] init];
             item.attachments = @[[[NSItemProvider alloc] initWithItem:selectedComponent.textMessage typeIdentifier:(__bridge NSString *)kUTTypeText]];
             
-            self.shareManager = [[ShareManager alloc] initWithShareExtensionContext:nil
-                                                                     extensionItems:@[item]];
+            self.shareManager = [[ShareManager alloc] initWithItems:@[item]];
             
             MXWeakify(self);
             [self.shareManager setCompletionCallback:^(ShareManagerResult result) {
@@ -3383,8 +3382,7 @@ const NSTimeInterval kResizeComposerAnimationDuration = .05;
                     NSExtensionItem *item = [[NSExtensionItem alloc] init];
                     item.attachments = @[[[NSItemProvider alloc] initWithItem:fileURL typeIdentifier:attachmentTypeToIdentifier[@(attachment.type)]]];
                     
-                    self.shareManager = [[ShareManager alloc] initWithShareExtensionContext:nil
-                                                                             extensionItems:@[item]];
+                    self.shareManager = [[ShareManager alloc] initWithItems:@[item]];
                     
                     MXWeakify(self);
                     [self.shareManager setCompletionCallback:^(ShareManagerResult result) {
