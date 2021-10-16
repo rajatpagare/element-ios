@@ -324,7 +324,7 @@ final class BuildSettings: NSObject {
     
     
     // MARK: - Authentication Screen
-    static let authScreenShowRegister = true
+	static let authScreenShowRegister = UIConfigurable.showRegisterButton
     static let authScreenShowPhoneNumber = true
     static let authScreenShowForgotPassword = true
     static let authScreenShowCustomServerOptions = true

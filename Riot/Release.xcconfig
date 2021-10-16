@@ -18,6 +18,7 @@
 // https://help.apple.com/xcode/#/dev745c5c974
 
 #include "Common.xcconfig"
+#include "UIConfigurable.xcconfig"
 #include "Pods/Target Support Files/Pods-RiotPods-Riot/Pods-RiotPods-Riot.release.xcconfig"
 
 PROVISIONING_PROFILE = $(RIOT_PROVISIONING_PROFILE)
